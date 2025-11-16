@@ -2,14 +2,61 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/colors.dart';
 import '../../services/chat_storage.dart';
+import '../menu/chat_menu_page.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final TextEditingController _textController = TextEditingController();
+
+  @override
+  void dispose() {
+    _textController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: Colors.white,
+      endDrawer: SizedBox(
+        width: MediaQuery.of(context).size.width * 0.80,
+        child: const ChatMenuPage(),
+      ),
+      drawerEdgeDragWidth: MediaQuery.of(context).size.width,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: true,
+        automaticallyImplyLeading: false,
+        title: Image.asset(
+          'assets/icon.png',
+          height: 40,
+          errorBuilder: (context, error, stackTrace) {
+            return const Text(
+              'ChatCycle',
+              style: TextStyle(
+                color: AppColors.purple,
+                fontWeight: FontWeight.bold,
+                fontSize: 24,
+              ),
+            );
+          },
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.menu, color: AppColors.purple, size: 28),
+            onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
+          ),
+        ],
+      ),
       bottomNavigationBar: _navBar(),
       body: SafeArea(
         child: Column(
@@ -84,8 +131,6 @@ class HomePage extends StatelessWidget {
   }
 
   Widget _inputField(BuildContext context) {
-    final controller = TextEditingController();
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
@@ -98,25 +143,21 @@ class HomePage extends StatelessWidget {
                 border: Border.all(color: AppColors.grey.withOpacity(0.25)),
               ),
               child: TextField(
-                controller: controller,
+                controller: _textController,
                 decoration: const InputDecoration(
                   border: InputBorder.none,
                   hintText: "Start typing...",
                 ),
+                textInputAction: TextInputAction.send,
+                onSubmitted: (value) async {
+                  await _handleSend();
+                },
               ),
             ),
           ),
           const SizedBox(width: 10),
           GestureDetector(
-            onTap: () async {
-              // Create a new session when navigating from home
-              await ChatStorage.createNewSession();
-              Navigator.pushNamed(
-                context,
-                "/chat",
-                arguments: controller.text.trim(),
-              );
-            },
+            onTap: _handleSend,
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: const BoxDecoration(
@@ -131,6 +172,22 @@ class HomePage extends StatelessWidget {
     );
   }
 
+  Future<void> _handleSend() async {
+    final message = _textController.text.trim();
+    if (message.isEmpty) return;
+    
+    // Create a new session when navigating from home
+    await ChatStorage.createNewSession();
+    if (mounted) {
+      _textController.clear(); // Clear the input
+      Navigator.pushNamed(
+        context,
+        "/chat",
+        arguments: message,
+      );
+    }
+  }
+
   Widget _navBar() {
     return BottomNavigationBar(
       currentIndex: 1,
@@ -139,12 +196,58 @@ class HomePage extends StatelessWidget {
       showUnselectedLabels: false,
       selectedItemColor: AppColors.purple,
       unselectedItemColor: AppColors.grey,
-      items: const [
-        BottomNavigationBarItem(icon: Icon(Icons.explore), label: "Explore"),
-        BottomNavigationBarItem(icon: Icon(Icons.chat), label: "Chat"),
-        BottomNavigationBarItem(icon: Icon(Icons.add_circle), label: "Create"),
-        BottomNavigationBarItem(icon: Icon(Icons.book), label: "Library"),
-        BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
+      items: [
+        const BottomNavigationBarItem(icon: Icon(Icons.explore), label: "Explore"),
+        const BottomNavigationBarItem(icon: Icon(Icons.chat), label: "Chat"),
+        BottomNavigationBarItem(
+          icon: Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppColors.purple,
+                  AppColors.purple.withOpacity(0.7),
+                ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.purple.withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Purple half circle background
+                Positioned(
+                  bottom: 0,
+                  child: Container(
+                    width: 50,
+                    height: 25,
+                    decoration: BoxDecoration(
+                      color: AppColors.purple,
+                      borderRadius: const BorderRadius.only(
+                        bottomLeft: Radius.circular(50),
+                        bottomRight: Radius.circular(50),
+                      ),
+                    ),
+                  ),
+                ),
+                // Plus icon
+                const Icon(Icons.add, color: Colors.white, size: 24),
+              ],
+            ),
+          ),
+          label: "Create",
+        ),
+        const BottomNavigationBarItem(icon: Icon(Icons.book), label: "Library"),
+        const BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
       ],
     );
   }

@@ -22,6 +22,28 @@ class _ChatInputState extends State<ChatInput> {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Row(
         children: [
+          // File attachment button
+          GestureDetector(
+            onTap: () {
+              // TODO: Implement file picker functionality
+              // For now, just show a snackbar
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('File attachment feature coming soon!'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.attach_file, color: AppColors.purple, size: 22),
+            ),
+          ),
+          const SizedBox(width: 10),
           Expanded(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 18),

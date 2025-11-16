@@ -110,7 +110,8 @@ class _ChatMenuPageState extends State<ChatMenuPage> with WidgetsBindingObserver
     await ChatStorage.setCurrentSessionId(session.id);
     if (mounted) {
       Navigator.of(context).pop(); // Close drawer
-      Navigator.of(context).pushReplacementNamed('/chat').then((_) {
+      // Navigate to chat page - it will reload the session in initState
+      Navigator.of(context).pushReplacementNamed('/chat', arguments: null).then((_) {
         // Refresh when returning
         _loadSessions();
       });

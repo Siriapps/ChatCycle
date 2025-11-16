@@ -16,7 +16,7 @@ class ChatCycleApp extends StatelessWidget {
       initialRoute: "/",
       routes: {
         "/": (_) => const HomePage(),
-        "/chat": (_) => const ChatPage(),
+        "/chat": (_) => ChatPage(key: UniqueKey()), // Create new instance each time
       },
     );
   }

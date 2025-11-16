@@ -24,12 +24,22 @@ class ChatSession {
   }
 
   factory ChatSession.fromJson(Map<String, dynamic> json) {
+    // Convert messages from List<dynamic> to List<Map<String, String>>
+    final messagesList = json['messages'] as List<dynamic>;
+    final messages = messagesList.map((msg) {
+      final msgMap = msg as Map<String, dynamic>;
+      return {
+        'role': msgMap['role']?.toString() ?? '',
+        'content': msgMap['content']?.toString() ?? '',
+      };
+    }).toList();
+    
     return ChatSession(
       id: json['id'] as String,
       title: json['title'] as String,
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
-      messages: List<Map<String, String>>.from(json['messages'] as List),
+      messages: messages,
     );
   }
 
