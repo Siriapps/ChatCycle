@@ -21,7 +21,20 @@ class ChatStorage {
     if (jsonStr == null) return [];
     
     final List<dynamic> sessionsList = jsonDecode(jsonStr);
-    return sessionsList.map((json) => ChatSession.fromJson(json as Map<String, dynamic>)).toList();
+    final sessions = <ChatSession>[];
+
+    for (final entry in sessionsList) {
+      if (entry is Map<String, dynamic>) {
+        try {
+          sessions.add(ChatSession.fromJson(entry));
+        } catch (_) {
+          // Skip corrupted entries
+          continue;
+        }
+      }
+    }
+
+    return sessions;
   }
 
   // Save a single session (add or update)

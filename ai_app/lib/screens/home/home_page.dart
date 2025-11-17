@@ -176,8 +176,9 @@ class _HomePageState extends State<HomePage> {
     final message = _textController.text.trim();
     if (message.isEmpty) return;
     
-    // Create a new session when navigating from home
-    await ChatStorage.createNewSession();
+    // Create a new chat when navigating from home
+    final chat = await ChatStorage.createNewSession();
+    await ChatStorage.setCurrentSessionId(chat.id);
     if (mounted) {
       _textController.clear(); // Clear the input
       Navigator.pushNamed(

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import '../../core/colors.dart';
 
 class ChatInput extends StatefulWidget {
-  final Function(String) onSend;
+  final Function(String, {String? fileUrl}) onSend;
 
   const ChatInput({
     super.key,
@@ -24,15 +25,36 @@ class _ChatInputState extends State<ChatInput> {
         children: [
           // File attachment button
           GestureDetector(
-            onTap: () {
-              // TODO: Implement file picker functionality
-              // For now, just show a snackbar
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('File attachment feature coming soon!'),
-                  duration: Duration(seconds: 2),
-                ),
-              );
+            onTap: () async {
+              try {
+                FilePickerResult? result = await FilePicker.platform.pickFiles(
+                  type: FileType.any,
+                  allowMultiple: false,
+                );
+
+                if (result != null && result.files.single.path != null) {
+                  final fileName = result.files.single.name;
+                  
+                  // For now, we'll just show the file name
+                  // In production, you'd upload to Firebase Storage and get URL
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('File selected: $fileName\n(Upload to Firebase Storage not implemented yet)'),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                  
+                  // Call onSend with file path (you'll need to upload to Firebase Storage first)
+                  // widget.onSend('', fileUrl: filePath);
+                }
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Error picking file: $e'),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              }
             },
             child: Container(
               padding: const EdgeInsets.all(12),

@@ -2,9 +2,15 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class OpenRouterStreamService {
-  final apiKey = "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";
+  static const apiKey = String.fromEnvironment('OPENROUTER_API_KEY', defaultValue: '');
 
   Stream<String> streamResponse(String prompt, {List<Map<String, String>>? conversationHistory}) async* {
+    if (apiKey.isEmpty) {
+      throw Exception(
+        'Missing OpenRouter API key. Please pass --dart-define=OPENROUTER_API_KEY=your_key when running the app.',
+      );
+    }
+
     final request = http.Request(
       "POST",
       Uri.parse("https://openrouter.ai/api/v1/chat/completions"),

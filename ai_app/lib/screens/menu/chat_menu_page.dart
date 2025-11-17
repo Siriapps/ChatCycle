@@ -17,6 +17,7 @@ class _ChatMenuPageState extends State<ChatMenuPage> with WidgetsBindingObserver
   DateTime? _filterFrom;
   DateTime? _filterTo;
   bool _hasActiveFilters = false;
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -41,35 +42,40 @@ class _ChatMenuPageState extends State<ChatMenuPage> with WidgetsBindingObserver
   Future<void> _loadSessions() async {
     final sessions = await ChatStorage.loadSessions();
     setState(() {
-      _sessions = sessions;
+      _sessions = sessions..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      _isLoading = false;
       _applyFilters();
     });
   }
 
   void _applyFilters() {
-    // Filter logic will be applied here when filters are set
     setState(() {
       _hasActiveFilters = _filterFrom != null || _filterTo != null;
     });
   }
 
-  List<ChatSession> get _filteredSessions {
+  List<ChatSession> get _filteredChats {
     var filtered = _sessions;
     
     if (_filterFrom != null) {
-      filtered = filtered.where((s) => s.updatedAt.isAfter(_filterFrom!) || 
-        s.updatedAt.isAtSameMomentAs(_filterFrom!)).toList();
+      filtered = filtered.where((chat) {
+        final updatedAt = chat.updatedAt;
+        return updatedAt.isAfter(_filterFrom!) || updatedAt.isAtSameMomentAs(_filterFrom!);
+      }).toList();
     }
     
     if (_filterTo != null) {
-      filtered = filtered.where((s) => s.updatedAt.isBefore(_filterTo!.add(const Duration(days: 1))) || 
-        s.updatedAt.isAtSameMomentAs(_filterTo!)).toList();
+      filtered = filtered.where((chat) {
+        final updatedAt = chat.updatedAt;
+        return updatedAt.isBefore(_filterTo!.add(const Duration(days: 1))) || 
+               updatedAt.isAtSameMomentAs(_filterTo!);
+      }).toList();
     }
     
-    return filtered..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return filtered;
   }
 
-  Map<String, List<ChatSession>> get _groupedSessions {
+  Map<String, List<ChatSession>> get _groupedChats {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final yesterday = today.subtract(const Duration(days: 1));
@@ -80,15 +86,14 @@ class _ChatMenuPageState extends State<ChatMenuPage> with WidgetsBindingObserver
       'Recent': [],
     };
     
-    for (final session in _filteredSessions) {
-      final sessionDate = DateTime(session.updatedAt.year, session.updatedAt.month, session.updatedAt.day);
-      
-      if (sessionDate == today) {
-        grouped['Today']!.add(session);
-      } else if (sessionDate == yesterday) {
-        grouped['Yesterday']!.add(session);
+    for (final chat in _filteredChats) {
+      final chatDate = DateTime(chat.updatedAt.year, chat.updatedAt.month, chat.updatedAt.day);
+      if (chatDate == today) {
+        grouped['Today']!.add(chat);
+      } else if (chatDate == yesterday) {
+        grouped['Yesterday']!.add(chat);
       } else {
-        grouped['Recent']!.add(session);
+        grouped['Recent']!.add(chat);
       }
     }
     
@@ -96,25 +101,52 @@ class _ChatMenuPageState extends State<ChatMenuPage> with WidgetsBindingObserver
   }
 
   Future<void> _handleNewChat() async {
-    await ChatStorage.createNewSession();
+    final newSession = await ChatStorage.createNewSession();
+    await ChatStorage.setCurrentSessionId(newSession.id);
+    await _loadSessions();
     if (mounted) {
       Navigator.of(context).pop(); // Close drawer
-      Navigator.of(context).pushReplacementNamed('/chat').then((_) {
-        // Refresh when returning
-        _loadSessions();
-      });
+      Navigator.of(context).pushReplacementNamed('/chat', arguments: null);
     }
   }
 
-  Future<void> _handleSessionTap(ChatSession session) async {
-    await ChatStorage.setCurrentSessionId(session.id);
+  Future<void> _handleChatTap(ChatSession chat) async {
+    await ChatStorage.setCurrentSessionId(chat.id);
     if (mounted) {
       Navigator.of(context).pop(); // Close drawer
-      // Navigate to chat page - it will reload the session in initState
-      Navigator.of(context).pushReplacementNamed('/chat', arguments: null).then((_) {
-        // Refresh when returning
-        _loadSessions();
-      });
+      Navigator.of(context).pushReplacementNamed('/chat', arguments: null);
+    }
+  }
+
+  Future<void> _handleDeleteChat(ChatSession chat) async {
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete chat?'),
+        content: Text('Delete "${chat.getPreviewTitle()}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldDelete == true) {
+      await ChatStorage.deleteSession(chat.id);
+      final currentId = await ChatStorage.getCurrentSessionId();
+      if (currentId == chat.id) {
+        await ChatStorage.setCurrentSessionId(null);
+      }
+      await _loadSessions();
     }
   }
 
@@ -141,16 +173,11 @@ class _ChatMenuPageState extends State<ChatMenuPage> with WidgetsBindingObserver
           });
         },
       ),
-    ).then((_) {
-      // Refresh when filter panel closes
-      _loadSessions();
-    });
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final grouped = _groupedSessions;
-    
     return Container(
       width: MediaQuery.of(context).size.width * 0.78,
       decoration: const BoxDecoration(
@@ -163,7 +190,6 @@ class _ChatMenuPageState extends State<ChatMenuPage> with WidgetsBindingObserver
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
           Padding(
             padding: const EdgeInsets.all(20),
             child: Row(
@@ -202,46 +228,49 @@ class _ChatMenuPageState extends State<ChatMenuPage> with WidgetsBindingObserver
           ),
           const Divider(),
 
-          // Chat History
           Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (grouped['Today']!.isNotEmpty) ...[
-                    _section("Today"),
-                    ...grouped['Today']!.map((session) => _item(session.getPreviewTitle(), () => _handleSessionTap(session))),
-                  ],
-                  
-                  if (grouped['Yesterday']!.isNotEmpty) ...[
-                    _section("Yesterday"),
-                    ...grouped['Yesterday']!.map((session) => _item(session.getPreviewTitle(), () => _handleSessionTap(session))),
-                  ],
-                  
-                  if (grouped['Recent']!.isNotEmpty) ...[
-                    _section("Recent"),
-                    ...grouped['Recent']!.map((session) => _item(session.getPreviewTitle(), () => _handleSessionTap(session))),
-                  ],
-                  
-                  if (_filteredSessions.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.all(40),
-                      child: Center(
-                        child: Text(
-                          "No chats found",
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            color: AppColors.grey,
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (_groupedChats['Today']!.isNotEmpty) ...[
+                          _section("Today"),
+                          ..._groupedChats['Today']!.map(
+                            (chat) => _item(chat),
                           ),
-                        ),
-                      ),
+                        ],
+                        if (_groupedChats['Yesterday']!.isNotEmpty) ...[
+                          _section("Yesterday"),
+                          ..._groupedChats['Yesterday']!.map(
+                            (chat) => _item(chat),
+                          ),
+                        ],
+                        if (_groupedChats['Recent']!.isNotEmpty) ...[
+                          _section("Recent"),
+                          ..._groupedChats['Recent']!.map(
+                            (chat) => _item(chat),
+                          ),
+                        ],
+                        if (_filteredChats.isEmpty && !_isLoading)
+                          Padding(
+                            padding: const EdgeInsets.all(40),
+                            child: Center(
+                              child: Text(
+                                "No chats found",
+                                style: GoogleFonts.inter(
+                                  fontSize: 14,
+                                  color: AppColors.grey,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
-                ],
-              ),
-            ),
+                  ),
           ),
 
-          // New Chat Button
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
@@ -309,16 +338,27 @@ class _ChatMenuPageState extends State<ChatMenuPage> with WidgetsBindingObserver
         ),
       );
 
-  Widget _item(String text, VoidCallback onTap) => InkWell(
-        onTap: onTap,
+  Widget _item(ChatSession chat) => InkWell(
+        onTap: () => _handleChatTap(chat),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-          child: Text(
-            text,
-            style: GoogleFonts.inter(
-              fontSize: 15,
-              color: AppColors.grey,
-            ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  chat.getPreviewTitle(),
+                  style: GoogleFonts.inter(
+                    fontSize: 15,
+                    color: AppColors.grey,
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, size: 20, color: AppColors.grey),
+                onPressed: () => _handleDeleteChat(chat),
+                tooltip: 'Delete chat',
+              ),
+            ],
           ),
         ),
       );

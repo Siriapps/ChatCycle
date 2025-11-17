@@ -24,21 +24,30 @@ class ChatSession {
   }
 
   factory ChatSession.fromJson(Map<String, dynamic> json) {
-    // Convert messages from List<dynamic> to List<Map<String, String>>
-    final messagesList = json['messages'] as List<dynamic>;
+    final messagesList = (json['messages'] as List<dynamic>?) ?? const [];
     final messages = messagesList.map((msg) {
-      final msgMap = msg as Map<String, dynamic>;
+      if (msg is Map<String, dynamic>) {
+        return {
+          'role': msg['role']?.toString() ?? '',
+          'content': msg['content']?.toString() ?? '',
+        };
+      }
       return {
-        'role': msgMap['role']?.toString() ?? '',
-        'content': msgMap['content']?.toString() ?? '',
+        'role': '',
+        'content': '',
       };
     }).toList();
     
+    final createdAtRaw = json['createdAt']?.toString();
+    final updatedAtRaw = json['updatedAt']?.toString();
+    
     return ChatSession(
-      id: json['id'] as String,
-      title: json['title'] as String,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: DateTime.parse(json['updatedAt'] as String),
+      id: json['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      title: (json['title']?.toString() ?? 'New Chat').trim().isEmpty
+          ? 'New Chat'
+          : json['title'].toString(),
+      createdAt: createdAtRaw != null ? DateTime.parse(createdAtRaw) : DateTime.now(),
+      updatedAt: updatedAtRaw != null ? DateTime.parse(updatedAtRaw) : DateTime.now(),
       messages: messages,
     );
   }
