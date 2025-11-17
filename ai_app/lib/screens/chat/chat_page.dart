@@ -61,10 +61,10 @@ class _ChatPageState extends State<ChatPage> {
     });
 
     // If there's an initial message, send it to AI
-    if (initialMessage != null && initialMessage.isNotEmpty) {
-      final message = initialMessage;
+    if (initialMessage != null && initialMessage.trim().isNotEmpty) {
+      final message = initialMessage.trim();
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _sendToAI(message);
+        sendMessage(message);
       });
     }
   }
