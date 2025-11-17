@@ -33,8 +33,9 @@ class OpenRouterStreamService {
       }));
     }
     
-    // Add the current user prompt
-    messages.add({"role": "user", "content": prompt});
+    // Add the current user prompt with word limit instruction
+    final promptWithLimit = "$prompt\n\nPlease write within 200 words.";
+    messages.add({"role": "user", "content": promptWithLimit});
 
     request.body = jsonEncode({
       "model": "openai/gpt-4.1-mini",
